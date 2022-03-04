@@ -18,9 +18,7 @@ import org.apache.lucene.search.similarities.Similarity;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.index.IndexSettings;
 import org.opensearch.index.codec.CodecService;
-import org.opensearch.index.codec.CodecServiceConfig;
 import org.opensearch.index.codec.CodecServiceFactory;
-import org.opensearch.index.mapper.MapperService;
 import org.opensearch.index.seqno.RetentionLeases;
 import org.opensearch.index.shard.ShardId;
 import org.opensearch.index.store.Store;
@@ -112,65 +110,20 @@ public class EngineConfigFactory {
             );
         }
 
-        final CodecService instance = codecService.orElse(null);
-        this.codecServiceFactory = (instance != null) ? (config) -> instance : codecServiceFactory.orElse(null);
+        if (codecService.isPresent()) {
+            final CodecService instance = codecService.get();
+            this.codecServiceFactory = (config) -> instance;
+        } else if (codecServiceFactory.isPresent()) {
+            this.codecServiceFactory = codecServiceFactory.get();
+        } else {
+            this.codecServiceFactory = (config) -> new CodecService(config.getMapperService(), config.getLogger());
+        }
+
         this.translogDeletionPolicyFactory = translogDeletionPolicyFactory.orElse((idxs, rtls) -> null);
     }
 
-    /**
-     * Instantiates a new EngineConfig from the provided custom overrides
-     * @deprecated please use overloaded {@code newEngineConfig} with {@link MapperService}
-     */
-    @Deprecated
-    public EngineConfig newEngineConfig(
-        ShardId shardId,
-        ThreadPool threadPool,
-        IndexSettings indexSettings,
-        Engine.Warmer warmer,
-        Store store,
-        MergePolicy mergePolicy,
-        Analyzer analyzer,
-        Similarity similarity,
-        CodecService codecService,
-        Engine.EventListener eventListener,
-        QueryCache queryCache,
-        QueryCachingPolicy queryCachingPolicy,
-        TranslogConfig translogConfig,
-        TimeValue flushMergesAfter,
-        List<ReferenceManager.RefreshListener> externalRefreshListener,
-        List<ReferenceManager.RefreshListener> internalRefreshListener,
-        Sort indexSort,
-        CircuitBreakerService circuitBreakerService,
-        LongSupplier globalCheckpointSupplier,
-        Supplier<RetentionLeases> retentionLeasesSupplier,
-        LongSupplier primaryTermSupplier,
-        EngineConfig.TombstoneDocSupplier tombstoneDocSupplier
-    ) {
-        return newEngineConfig(
-            shardId,
-            threadPool,
-            indexSettings,
-            warmer,
-            store,
-            mergePolicy,
-            analyzer,
-            similarity,
-            codecService,
-            eventListener,
-            queryCache,
-            queryCachingPolicy,
-            translogConfig,
-            flushMergesAfter,
-            externalRefreshListener,
-            internalRefreshListener,
-            indexSort,
-            circuitBreakerService,
-            globalCheckpointSupplier,
-            retentionLeasesSupplier,
-            primaryTermSupplier,
-            tombstoneDocSupplier,
-            null
-        );
+    public CodecServiceFactory getCodecServiceFactory() {
+        return codecServiceFactory;
     }
 
     /** Instantiates a new EngineConfig from the provided custom overrides */
@@ -196,8 +149,7 @@ public class EngineConfigFactory {
         LongSupplier globalCheckpointSupplier,
         Supplier<RetentionLeases> retentionLeasesSupplier,
         LongSupplier primaryTermSupplier,
-        EngineConfig.TombstoneDocSupplier tombstoneDocSupplier,
-        MapperService mapperService
+        EngineConfig.TombstoneDocSupplier tombstoneDocSupplier
     ) {
 
         return new EngineConfig(
@@ -209,9 +161,7 @@ public class EngineConfigFactory {
             mergePolicy,
             analyzer,
             similarity,
-            this.codecServiceFactory != null
-                ? this.codecServiceFactory.createCodecService(new CodecServiceConfig(indexSettings, mapperService))
-                : codecService,
+            codecService,
             eventListener,
             queryCache,
             queryCachingPolicy,
