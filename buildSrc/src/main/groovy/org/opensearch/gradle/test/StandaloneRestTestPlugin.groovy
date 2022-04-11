@@ -34,6 +34,8 @@ import groovy.transform.CompileStatic
 import org.opensearch.gradle.OpenSearchJavaPlugin
 import org.opensearch.gradle.ExportOpenSearchBuildResourcesTask
 import org.opensearch.gradle.RepositoriesSetupPlugin
+import org.opensearch.gradle.Version
+import org.opensearch.gradle.VersionProperties
 import org.opensearch.gradle.info.BuildParams
 import org.opensearch.gradle.info.GlobalBuildInfoPlugin
 import org.opensearch.gradle.precommit.PrecommitTasks
@@ -91,7 +93,14 @@ class StandaloneRestTestPlugin implements Plugin<Project> {
 
         // create a compileOnly configuration as others might expect it
         project.configurations.create("compileOnly")
-        project.dependencies.add('testImplementation', project.project(':test:framework'))
+
+        // For internal projects, using the project test framework dependency. Otherwise, use the opensearch test
+        // framework one
+        if (project.rootProject.name == "OpenSearch" && project.project(':test:framework') != null) {
+            project.dependencies.add('testImplementation', project.project(':test:framework'))
+        } else {
+            project.dependencies.add('testImplementation', "org.opensearch.test:framework:${Version.fromString(VersionProperties.getOpenSearch()).toString()}")
+        }
 
         EclipseModel eclipse = project.extensions.getByType(EclipseModel)
         eclipse.classpath.sourceSets = [testSourceSet]
